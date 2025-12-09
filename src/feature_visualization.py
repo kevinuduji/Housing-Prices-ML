@@ -93,6 +93,74 @@ def plot_top3_detailed(top3_df: pd.DataFrame):
    plt.close()
    print(f"Saved Top 3 Detailed Impact -> {out}")
 
+
+def plot_boxplots(df: pd.DataFrame, top_features: list[str]):
+   # Box plots for SalePrice by top features
+   for feature in top_features:
+       if feature not in df.columns:
+           continue
+       plt.figure(figsize=(6, 4))
+       if HAVE_SEABORN:
+           sns.boxplot(data=df, x=feature, y='SalePrice')
+       else:
+           cats = df[feature].astype(str)
+           cat_codes = pd.factorize(cats)[0]
+           plt.scatter(cat_codes + np.random.uniform(-0.15, 0.15, size=len(cat_codes)), df['SalePrice'], alpha=0.5)
+           plt.xticks(range(len(np.unique(cats))), np.unique(cats))
+       plt.title(f'SalePrice Distribution by {feature}')
+       plt.xlabel(feature)
+       plt.ylabel('SalePrice')
+       plt.tight_layout()
+       out = os.path.join(FIG_DIR, f'boxplot_{feature}.png')
+       plt.savefig(out, dpi=150)
+       plt.close()
+       print(f"Saved Box Plot for {feature} -> {out}")
+
+
+def plot_mean_price_by_category(df: pd.DataFrame, top_features: list[str]):
+   # Bar chart of mean SalePrice by category for top features
+   for feature in top_features:
+       if feature not in df.columns:
+           continue
+       mean_vals = df.groupby(feature)['SalePrice'].mean().sort_values(ascending=False)
+       plt.figure(figsize=(6, 4))
+       plt.bar(mean_vals.index.astype(str), mean_vals.values, color='steelblue')
+       plt.title(f'Mean SalePrice by {feature}')
+       plt.xticks(rotation=30, ha='right')
+       plt.ylabel('Mean SalePrice')
+       for x, y in zip(mean_vals.index.astype(str), mean_vals.values):
+           plt.text(x, y, f"{y:,.0f}", ha='center', va='bottom', rotation=90)
+       plt.tight_layout()
+       out = os.path.join(FIG_DIR, f'mean_price_{feature}.png')
+       plt.savefig(out, dpi=150)
+       plt.close()
+       print(f"Saved Mean Price Bar for {feature} -> {out}")
+
+
+def plot_coefficient_spectrum(importance_df: pd.DataFrame, top_features: list[str]):
+   # Scatter plot of all coefficients, highlight top features
+   plt.figure(figsize=(12, 6))
+   x = np.arange(len(importance_df))
+   plt.scatter(x, importance_df['AbsCoefficient'], s=30, color='gray', alpha=0.6, label='Other Features')
+   for feature in top_features:
+       row = importance_df[importance_df['Feature'] == feature]
+       if not row.empty:
+           idx = row.index[0]
+           plt.scatter(idx, row['AbsCoefficient'].iloc[0], s=120, color='red', edgecolors='black', label=feature)
+           plt.text(idx, row['AbsCoefficient'].iloc[0], feature, fontsize=9, ha='center', va='bottom')
+   plt.title('Coefficient Spectrum')
+   plt.xlabel('Feature Index (sorted by importance)')
+   plt.ylabel('Absolute Coefficient')
+   handles, labels = plt.gca().get_legend_handles_labels()
+   unique = dict(zip(labels, handles))
+   plt.legend(unique.values(), unique.keys(), fontsize=8)
+   plt.tight_layout()
+   out = os.path.join(FIG_DIR, 'coefficient_spectrum.png')
+   plt.savefig(out, dpi=150)
+   plt.close()
+   print(f"Saved Coefficient Spectrum -> {out}")
+
+
 def main():
    print("=== Feature Visualization Pipeline (Linear Regression Aligned) ===")
    importance_df, top3_df, top3_list, raw_train_df = compute_linear_regression_importance()
@@ -113,12 +181,21 @@ def main():
    plot_top3_detailed(top3_df)
 
 
+   print("Generating Box Plots...")
+   plot_boxplots(raw_train_df, top_features=top3_list)
+
+
+   print("Generating Mean Price by Category plots...")
+   plot_mean_price_by_category(raw_train_df, top_features=top3_list)
+
+
+   print("Generating Coefficient Spectrum plot...")
+   plot_coefficient_spectrum(importance_df, top_features=top3_list)
+
+
    print("All figures saved in 'figures/'.")
    print("Done.")
 
 
 if __name__ == '__main__':
    main()
-
-
-
